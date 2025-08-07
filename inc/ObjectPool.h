@@ -1,8 +1,9 @@
 #pragma once
+#include <cstddef>
+#include <new>
+#include <cstdlib>
+#include <algorithm>
 
-#include <iostream>
-using std::cout;
-using std::endl;
 
 template <class T>
 class ObjectPool {
@@ -12,7 +13,7 @@ class ObjectPool {
         size_t _remanetBytes = 0;
 
     public:
-        T* new(){
+        T* New(){
 
             T* obj = nullptr;
 
@@ -22,7 +23,7 @@ class ObjectPool {
                 _freelist = next; // pop from freelist
             }
             else {
-                if(_remaneBytes < sizeof(T)){
+                if(_remanetBytes < sizeof(T)){
                     _remanetBytes = 128*1024;
                     _memory = (char*)malloc(_remanetBytes);
                     if(_memory==nullptr){
@@ -31,15 +32,17 @@ class ObjectPool {
                 }
 
                 obj = (T*)_memory;
-                size_t objSize = sizeof(T)<sizeof(void*) ? sizeof(void*) : size(T);
+                size_t objSize = sizeof(T)<sizeof(void*) ? sizeof(void*) : sizeof(T);
                 _memory += objSize;
                 _remanetBytes -= objSize;
             }
-
+            new(obj)T;
             return obj;
         }
 
-        void* delete(T* obj){ //head insert
+        void Delete(T* obj){ //head insert
+
+            obj->~T();
 
             *(void**)obj = _freelist;
             _freelist = obj;
