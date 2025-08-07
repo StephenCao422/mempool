@@ -13,6 +13,7 @@ class ObjectPool {
 
     public:
         T* new(){
+
             T* obj = nullptr;
 
             if(_remaneBytes < sizeof(T)){
@@ -28,6 +29,18 @@ class ObjectPool {
             _remanetBytes -= sizeof(T);
 
             return obj;
+        }
+
+        void* delete(T* obj){
+
+            if(_freelist ==nullptr){ //freelist is empty
+                *(void**)obj = nullptr; //*(void**) get ptr size in diff sys
+                _freelist = obj;
+            }
+            else{ //freelist not empty, head insert
+                *(void**) obj = _freelist;
+                _freelist = obj;
+            }
         }
 
 };
