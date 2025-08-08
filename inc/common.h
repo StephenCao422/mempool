@@ -16,6 +16,11 @@ static void*& ObjNext(void* obj){
 class FreeList
 {
 public:
+
+    bool Empty(){
+        return _freeList == nullptr;
+    }
+
     void Push(void* obj){
         assert(obj);
         ObjNext(obj) = _freeList;
