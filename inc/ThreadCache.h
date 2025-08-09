@@ -11,9 +11,9 @@ public:
 
 private:
     FreeList _freeLists[FREE_LIST_NUM]; //hash table of freelist 
-
-
 };
+
+static _declspec(thread) ThreadCache* pTLSThreadCache = nullptr;
 
 class SizeClass
 {
