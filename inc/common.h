@@ -9,6 +9,7 @@ using std::endl;
 
 static const size_t FREE_LIST_NUM = 208; // num of free lists in hash table
 static const size_t MAX_BYTES     = 256*1024; //tc max alloate byte once
+static const size_t PAGE_NUM     = 129; //max manage page num of span
 
 static void*& ObjNext(void* obj){
     return *(void**)obj;
