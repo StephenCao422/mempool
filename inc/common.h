@@ -10,6 +10,7 @@ using std::endl;
 static const size_t FREE_LIST_NUM = 208; // num of free lists in hash table
 static const size_t MAX_BYTES     = 256*1024; //tc max alloate byte once
 static const size_t PAGE_NUM     = 129; //max manage page num of span
+static const size_t PAGE_SHIFT   = 13;  //8KB page
 
 static void*& ObjNext(void* obj){
     return *(void**)obj;
@@ -64,6 +65,22 @@ struct Span
 class SpanList
 {
 public:
+    Span* PopFront(){
+        Span* front = _head->next;
+        Erase(front);
+        return front;
+    }
+
+    bool Empty(){
+        return _head->next == _head;
+    }
+
+    Span* Begin(){
+        return _head->next;
+    }
+    Span* End(){
+        return _head;
+    }
     std::mutex _mtx;
     SpanList(){
         _head = new Span;
@@ -177,6 +194,16 @@ public:
         }
 
         return num;
+    }
+
+    static size_t NumMovePage(size_t size){
+        size_t num = NumMoveSize(size);
+        size_t npage = num*size;
+        npage >>=PAGE_SHIFT;
+        if(npage == 0){
+            npage = 1;
+        }
+        return npage;
     }
 
 

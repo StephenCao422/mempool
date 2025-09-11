@@ -9,6 +9,8 @@ class PageCache
             return &_sInst;
         }
 
+        Span* NewSpan(size_t k); //pc bring a k page span from _spanLists
+
     private: 
         SpanList _spanLists[PAGE_NUM]; //hash bucket each have span
         std::mutex _pageMtx;

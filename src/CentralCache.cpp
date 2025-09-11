@@ -28,5 +28,36 @@ size_t FetchRangeObj(void*& start, void*& end, size_t batchNum, size_t size){
 }
 
 Span* CentralCache::GetOneSpan(SpanList& list, size_t size){
-    return nullptr;
+    //find cc have non-empty span
+    Span* it = list.Begin();
+    while(it != list.End()){
+        if(it->_freeList != nullptr){
+            return it;
+        }
+        else{
+            it = it->_next;
+        }
+    }
+    //cc have no non-empty span,bring a new span from pc
+    size_t k = SizeClass::NumMovePage(size); //num of page need to bring from pc
+    Span* span = PageCache::GetInstance()->NewSpan(k);
+    
+    char* start = (char*)(span->_pageID << PAGE_SHIFT);
+    char* end = (char*)(start+ (span->_n << PAGE_SHIFT));
+
+    //cut the span into small block
+    span->freeList = start;
+    void* tail - start;
+    start += size;
+
+    while(start<end){
+        ObjNext(tail) = start;
+        start += size;
+        tail = ObjNext(tail);
+    }
+    ObjNext(tail) = nullptr;
+
+    //insert the new span into spanlist
+    list.PushFront(span);
+    return span;
 }
