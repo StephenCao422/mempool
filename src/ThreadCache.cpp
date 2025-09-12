@@ -30,7 +30,10 @@ void* ThreadCache::Deallocate(void* obj, size_t size){
     no limit then batchNum=MaxNum, reach limit then batchNum = NumMoveSize
 */
 void* FetchFromCentralCache(size_t index, size_t alignSize){
-    size_t batchNum = std::min(_freeLists[index].MaxSize(), SizeClass::NumMoveSize(alignSize));
+#ifdef _WIN32
+    size_t batchNum = min(_freeLists[index].MaxSize(), SizeClass::NumMoveSize(alignSize));
+#else
+#endif // _WIN32
 
     if(batchNum == _freeLists[index].MaxSize()){
         //if not reach max limit, next apply for this memory can apply one more 

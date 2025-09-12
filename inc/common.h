@@ -12,6 +12,23 @@ static const size_t MAX_BYTES     = 256*1024; //tc max alloate byte once
 static const size_t PAGE_NUM     = 129; //max manage page num of span
 static const size_t PAGE_SHIFT   = 13;  //8KB page
 
+#ifdef _WIN32
+    #include <windows.h>
+#else
+
+#endif // _WIN32
+
+inline static void* SystemAlloc(size_t kpage){
+#ifdef _WIN32
+    void* ptr = VirtualAlloc(0, kpage<<13, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+#else
+#endif
+    if(ptr == NULL){
+        throw std::bad_alloc();
+    }
+    return ptr;
+}
+
 static void*& ObjNext(void* obj){
     return *(void**)obj;
 }
