@@ -13,6 +13,9 @@ class ObjectPool {
         size_t _remanetBytes = 0;
 
     public:
+        std::mutex _poolMtx; //prevent tc get nullptr
+
+    public:
         T* New(){
 
             T* obj = nullptr;
@@ -47,5 +50,7 @@ class ObjectPool {
             *(void**)obj = _freelist;
             _freelist = obj;
         }
+
+        new(obj) T;
 
 };

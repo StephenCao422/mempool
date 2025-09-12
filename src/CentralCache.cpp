@@ -49,6 +49,7 @@ Span* CentralCache::GetOneSpan(SpanList& list, size_t size){
     PageCache:: GetInstance()._pageMtx.lock();
     Span* span = PageCache::GetInstance()->NewSpan(k);
     span->_isUse = true; //mark span is in cc
+    span->_objSize = size;
     PageCache:: GetInstance()._pageMtx.unlock();
     
     char* start = (char*)(span->_pageID << PAGE_SHIFT);

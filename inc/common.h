@@ -29,6 +29,14 @@ inline static void* SystemAlloc(size_t kpage){
     return ptr;
 }
 
+inline static void SystemFree(void* ptr)
+{
+#ifdef _WIN32
+	VirtualFree(ptr, 0, MEM_RELEASE);
+#else
+#endif
+}
+
 static void*& ObjNext(void* obj){
     return *(void**)obj;
 }
@@ -91,6 +99,7 @@ struct Span
 {
     PageID _pageID = 0;
     size_t _n = 0;          //current page number manager by span
+    size_t _objSize = 0;   //size of single block memory alloc by span
 
     void* _freeList = nullptr;  // head node of small space under each span
     size_t use_count = 0;   // number of block memory alloc by current span
@@ -181,8 +190,7 @@ public:
         else if(size <= 256*1024){
             return _RoundUp(size, 8*1024);//[64*1024+1,256*1024] 8*1024B
         }else{
-            assert(false);
-            return -1;
+            return _RoundUp(size, 8*1024); // >256KB, system alloc
         }
     }
 

@@ -3,24 +3,38 @@
 PageCache PageCache::_sInst; //Eager Singleton object
 
 Span* NewSpan(size_t k){\
-    assert(k>0 && k<=PAGE_NUM);
+    assert(k>0);
 
     // GetInstance()._pageMtx.lock();
 
+    if (k > PAGE_NUM - 1) 
+	{
+		void* ptr = SystemAlloc(k);
+		Span* span = _spanPool.New();
+		
+		span->_pageID = ((PageID)ptr >> PAGE_SHIFT);
+		span->_n = k;
+
+		_idSpanMap.set(span->_pageID, span);
+
+		return span;
+	}
+
     //1. kth bucket has span
     if(!_spanLists[k].Empty()){
-        return _spanLists[k].PopFront();
+        Span* span =  _spanLists[k].PopFront();
 
         for(PageID i=0; i<span->_n; i++){
             _idSpanMap[span->_pageID+i]= span;
         }
+        return span;
     }
     //2. kth bucket not have span, but other bucket behide have span
     for(int i=k+1; i<PAGE_NUM; i++){
         if(!_spanLists[i].Empty()){
             Span* nSpan = _spanLists[i].PopFront();
 
-            Span* kSpan = new Span;
+            Span* kSpan = _spanPool.New(); //new Span object from pool
 
             kSpan->_pageID = nSpan->_pageID;
             kSpan->_n = k;
@@ -42,7 +56,7 @@ Span* NewSpan(size_t k){\
     }
     //3. kth bucket and other bucket not have span
     void* ptr = SystemAlloc(PAGE_NUM-1);
-    Span* bigSpan = new Span;
+    Span* bigSpan =  _spanPool.New();
     
     bigSpan->_pageID = ((PageID)ptr)>>PAGE_SHIFT;
     bigSpan->_n = PAGE_NUM-1;
@@ -54,6 +68,9 @@ Span* NewSpan(size_t k){\
 
 Span* PageCache::MapObjToSpan(void* obj){
     PageID id = (PageID)obj >> PAGE_SHIFT;
+
+    std::unique_lock<std::mutex> lc(_pageMtx);
+
     auto it = _idSpanMap.find(id);
 
     if(it != _idSpanMap.end()){
@@ -66,6 +83,16 @@ Span* PageCache::MapObjToSpan(void* obj){
 
 
 void ReleaseSpanToPageCache(Span* span){
+    if (span->_n > PAGE_NUM - 1)
+	{
+		void* ptr = (void*)(span->_pageID << PAGE_SHIFT);
+		SystemFree(ptr);
+		_spanPool.Delete(span);
+
+		return;
+	}
+
+
     while(1){
         PageID leftID = span->_pageID -1;
         auto it = _idSpanMap.find(leftID);
@@ -88,7 +115,8 @@ void ReleaseSpanToPageCache(Span* span){
         span->_n += leftSpan->_n;
 
         _spanLists[leftSpan->_n].Erase(leftSpan);
-        delete leftSpan;
+        // delete leftSpan;?
+        _spanPool.Delete(leftSpan);
     }
     while(1){
         PageID rightID = span->_pageID + span->_n;
@@ -111,7 +139,8 @@ void ReleaseSpanToPageCache(Span* span){
         span->_n += rightSpan->_n;
 
         _spanLists[rightSpan->_n].Erase(rightSpan);
-        delete rightSpan;
+        // delete rightSpan;
+        _spanPool.Delete(rightSpan);
     }
     _spanLists[span->_n].PushFront(span);
 	span->_isUse = false;// back from cc to pc

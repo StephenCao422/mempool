@@ -22,6 +22,8 @@ class PageCache
 
         std::unordered_map<PageID, Span*> _idSpanMap; //hash map record pageID to span
 
+        ObjectPool<Span> _spanPool; //span object pool
+
     private:
         PageCache(){}
         PageCache(const PageCache& pc) = delete;
