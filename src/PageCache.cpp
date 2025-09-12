@@ -25,6 +25,13 @@ Span* NewSpan(size_t k){\
 
     }
     //3. kth bucket and other bucket not have span
+    void* ptr = SystemAlloc(PAGE_NUM-1);
+    Span* bigSpan = new Span;
+    
+    bigSpan->_pageID = ((PageID)ptr)>>PAGE_SHIFT;
+    bigSpan->_n = PAGE_NUM-1;
 
-    return nullptr;
+    _spanLIsts[PAGE_NUM-1].PushFront(bigSpan);
+    return NewSpan(k);
+
 }
