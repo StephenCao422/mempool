@@ -21,6 +21,7 @@ size_t FetchRangeObj(void*& start, void*& end, size_t batchNum, size_t size){
         i++;
     }
     span->_freeList = ObjNext(end);
+    span->use_count += actualNum;
     ObjNext(end) = nullptr; //cut off the link
 
     _spanLists[index]._mtx.unlock();
