@@ -17,6 +17,8 @@ public:
     size_t FetchRangeObj(void*& start, void*& end, size_t n, size_t size);
     Span* GetOneSpan(SpanList& list, size_t size);
 
+    void ReleaseListToSpans(void* start, size_t size);
+
 private:
     CentralCache(){}
     CentralCache(const CentralCache& copy) = delete;

@@ -10,6 +10,10 @@ Span* NewSpan(size_t k){\
     //1. kth bucket has span
     if(!_spanLists[k].Empty()){
         return _spanLists[k].PopFront();
+
+        for(PageID i=0; i<span->_n; i++){
+            _idSpanMap[span->_pageID+i]= span;
+        }
     }
     //2. kth bucket not have span, but other bucket behide have span
     for(int i=k+1; i<PAGE_NUM; i++){
@@ -22,6 +26,11 @@ Span* NewSpan(size_t k){\
             kSpan->_n = k;
 
             _spanLists[nSpan->n].PushFront(nSpan);
+
+            for(PageID i=0; i<kSpan->_n; i++){
+                _idSpanMap[kSpan->_pageID+i]= kSpan;
+            }
+
             return kSpan;
         }
         
@@ -37,4 +46,16 @@ Span* NewSpan(size_t k){\
     _spanLIsts[PAGE_NUM-1].PushFront(bigSpan);
     return NewSpan(k);
 
+}
+
+Span* PageCache::MapObjToSpan(void* obj){
+    PageID id = (PageID)obj >> PAGE_SHIFT;
+    auto it = _idSpanMap.find(id);
+    
+    if(it != _idSpanMap.end()){
+        return it->second;
+    } else{
+        assert(false);
+        return nullptr;
+    }
 }

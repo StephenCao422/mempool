@@ -36,9 +36,26 @@ static void*& ObjNext(void* obj){
 class FreeList
 {
 public:
-    void PushRange(void* start, void* end){ //head insert multiple nodes
+    size_t Size(){
+        return _size;
+    }
+
+    void PopRange(void*&start, void*& end, size_t n){
+        assert(n<=_size);
+        start = _freeList;
+        end = _freeList;
+        for(size_t i=0; i<n-1; i++){
+            end = ObjNext(end);
+        }
+        _freeList = ObjNext(end);
+        ObjNext(end) = nullptr;
+        _size -= n;
+    }
+
+    void PushRange(void* start, void* end, size_t size){ //head insert multiple nodes
         ObjNext(end) = _freeList;
         _freeList = start;
+        _size += size;
     }
 
     bool Empty(){
@@ -49,12 +66,14 @@ public:
         assert(obj);
         ObjNext(obj) = _freeList;
         _freeList = obj;
+        _size++;
     }
 
     void* Pop(){
         assert(_freeList);
         void* obj = _freeList;
         _freeList = ObjNext(_freeList);
+        _size--;
         return obj;
     }
 
@@ -65,6 +84,7 @@ public:
 private:
     void* _freeList = nullptr;
     size_t _maxSize = 1; //cur freelist apply not reach max, default 1
+    size_t _size = 0; //how many obj in freelist
 }
 
 struct Span

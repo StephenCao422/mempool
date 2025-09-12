@@ -51,8 +51,16 @@ void* FetchFromCentralCache(size_t index, size_t alignSize){
         assert(start==end);
         return start;//actual num =1, return start;
     } else{
-        _freeLists[index].PushRange(ObjNext(start), end);
+        _freeLists[index].PushRange(ObjNext(start), end, actuNum-1);
         return start;
     }
 }
 
+ void  LisrTooLong(FreeList& list, size_t size){
+    void* start = nullptr;
+    void* end = nullptr;
+
+    list.PopRange(start,end, list.MaxSize());
+
+    CentralCache::GetInstance()->ReleaseListToSpans(start, size);
+ }

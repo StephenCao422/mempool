@@ -71,3 +71,28 @@ Span* CentralCache::GetOneSpan(SpanList& list, size_t size){
     list.PushFront(span);
     return span;
 }
+
+void ReleaseListToSpans(void* start, size_t size){
+    size_t index = SizeClass::Index(size);
+
+    _spanLists[index]._mtx.lock();
+
+    _spanLists[index]._mtx.unlock();
+
+    while(start){
+        void* next = ObjNext(start);
+        
+        Span* span = PageCache::GetInstance()->MapObjToSpan(start);
+
+        ObjNext(start) = span->_freeList;
+        span->_freeList = start;
+
+        span->use_count--;
+
+        if(span->use_count == 0){
+            //give span to pc to manage
+        }
+
+        start = next;
+    }
+}
