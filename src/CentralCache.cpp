@@ -48,6 +48,7 @@ Span* CentralCache::GetOneSpan(SpanList& list, size_t size){
     //avoid deadlock in recursive
     PageCache:: GetInstance()._pageMtx.lock();
     Span* span = PageCache::GetInstance()->NewSpan(k);
+    span->_isUse = true; //mark span is in cc
     PageCache:: GetInstance()._pageMtx.unlock();
     
     char* start = (char*)(span->_pageID << PAGE_SHIFT);
@@ -57,8 +58,11 @@ Span* CentralCache::GetOneSpan(SpanList& list, size_t size){
     span->freeList = start;
     void* tail - start;
     start += size;
+    
+    int i =0;
 
     while(start<end){
+        i++;
         ObjNext(tail) = start;
         start += size;
         tail = ObjNext(tail);
@@ -91,6 +95,18 @@ void ReleaseListToSpans(void* start, size_t size){
 
         if(span->use_count == 0){
             //give span to pc to manage
+            _spanLists[index].Erase(span);
+            span->_freeList = nullptr;
+            span->_next = nullptr;
+            span->_prev = nullptr;
+
+            _spanLists[index]._mtx.unlock();
+
+            PageCache::GetInstance()->_pageMtx.lock();
+            PageCache::GetInstance()->ReleaseSpanToPageCache(span);
+            PageCache::GetInstance()->_pageMtx.unlock();
+
+            _spanLists[index]._mtx.lock();
         }
 
         start = next;

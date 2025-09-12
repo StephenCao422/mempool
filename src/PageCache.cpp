@@ -27,6 +27,10 @@ Span* NewSpan(size_t k){\
 
             _spanLists[nSpan->n].PushFront(nSpan);
 
+            // n-k page span map to span
+            _idSpanMap[nSpan->_pageID] = nSpan;
+            _idSpanMap[nSpan->_pageID + nSpan->_n -1] = nSpan;
+
             for(PageID i=0; i<kSpan->_n; i++){
                 _idSpanMap[kSpan->_pageID+i]= kSpan;
             }
@@ -51,11 +55,40 @@ Span* NewSpan(size_t k){\
 Span* PageCache::MapObjToSpan(void* obj){
     PageID id = (PageID)obj >> PAGE_SHIFT;
     auto it = _idSpanMap.find(id);
-    
+
     if(it != _idSpanMap.end()){
         return it->second;
     } else{
         assert(false);
         return nullptr;
+    }
+}
+
+
+void ReleaseSpanToPageCache(Span* span){
+    while(1){
+        PageID leftID = span->_pageID -1;
+        auto it = _idSpanMap.find(leftID);
+
+        if(it == _idSpanMap.end()){
+            break;
+        }
+
+        Span* leftSpan = it->second;
+
+        if(leftSpan->_isUsed == true){
+            break;
+        }
+
+        if(leftSpan->_n + span->_n > PAGE_NUM -1){
+            break;
+        }
+
+        span->_pageID = leftSpan->_pageID;
+        span->_n += leftSpan->_n;
+
+        _spanLists[leftSpan->_n].Erase(leftSpan);
+        delete leftSpan;
+
     }
 }

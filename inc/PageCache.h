@@ -11,6 +11,10 @@ class PageCache
 
         Span* NewSpan(size_t k); //pc bring a k page span from _spanLists
 
+        Span* MapObjToSpan(void* obj); //map obj to span
+
+        void ReleaseSpanToPageCache(Span* span); //release span to pc
+
         std::mutex _pageMtx;
 
     private: 

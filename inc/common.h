@@ -97,6 +97,8 @@ struct Span
 
     Span* _prev = nullptr;
     Span* _next = nullptr;
+
+    bool _isUse = false; //whether span is in cc or pc
 };
 
 class SpanList
