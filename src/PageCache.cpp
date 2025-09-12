@@ -89,6 +89,35 @@ void ReleaseSpanToPageCache(Span* span){
 
         _spanLists[leftSpan->_n].Erase(leftSpan);
         delete leftSpan;
-
     }
+    while(1){
+        PageID rightID = span->_pageID + span->_n;
+        auto it = _idSpanMap.find(rightID);
+
+        if(it == _idSpanMap.end()){
+            break;
+        }
+
+        Span* rightSpan = it->second;
+
+        if(rightSpan->_isUsed == true){
+            break;
+        }
+
+        if(rightSpan->_n + span->_n > PAGE_NUM -1){
+            break;
+        }
+
+        span->_n += rightSpan->_n;
+
+        _spanLists[rightSpan->_n].Erase(rightSpan);
+        delete rightSpan;
+    }
+    _spanLists[span->_n].PushFront(span);
+	span->_isUse = false;// back from cc to pc
+
+	/*_idSpanMap[span->_pageID] = span; 
+	_idSpanMap[span->_pageID + span->_n - 1] = span;*/
+	_idSpanMap.set(span->_pageID, span);
+	_idSpanMap.set(span->_pageID + span->_n - 1, span);
 }
