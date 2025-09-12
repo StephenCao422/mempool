@@ -4,6 +4,9 @@ PageCache PageCache::_sInst; //Eager Singleton object
 
 Span* NewSpan(size_t k){\
     assert(k>0 && k<=PAGE_NUM);
+
+    // GetInstance()._pageMtx.lock();
+
     //1. kth bucket has span
     if(!_spanLists[k].Empty()){
         return _spanLists[k].PopFront();

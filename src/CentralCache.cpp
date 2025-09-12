@@ -38,9 +38,16 @@ Span* CentralCache::GetOneSpan(SpanList& list, size_t size){
             it = it->_next;
         }
     }
+
+    list._mtx.unlock(); //temp unlock cc mtx (pc can get mtx)
+
     //cc have no non-empty span,bring a new span from pc
     size_t k = SizeClass::NumMovePage(size); //num of page need to bring from pc
+
+    //avoid deadlock in recursive
+    PageCache:: GetInstance()._pageMtx.lock();
     Span* span = PageCache::GetInstance()->NewSpan(k);
+    PageCache:: GetInstance()._pageMtx.unlock();
     
     char* start = (char*)(span->_pageID << PAGE_SHIFT);
     char* end = (char*)(start+ (span->_n << PAGE_SHIFT));
@@ -56,6 +63,8 @@ Span* CentralCache::GetOneSpan(SpanList& list, size_t size){
         tail = ObjNext(tail);
     }
     ObjNext(tail) = nullptr;
+
+    list._mtx.lock(); //lock cc mtx back after pc mtx unlock
 
     //insert the new span into spanlist
     list.PushFront(span);
