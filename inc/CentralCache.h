@@ -25,7 +25,7 @@ private:
     CentralCache& operator=(const CentralCache& copy) = delete;
 
 private:
-    SpanList _spanList[FREE_LIST_NUM]; //hash bucket each have span
+    SpanList _spanLists[FREE_LIST_NUM]; //hash bucket each have span
     static CentralCache _sInst;//Eager Singleton
 
 };

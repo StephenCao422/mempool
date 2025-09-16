@@ -3,6 +3,12 @@
 #include <iostream>
 #include <vector>
 #include <mutex>
+#include <cassert>
+#include <unordered_map>
+#ifndef _WIN32
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
 using std::vector; 
 using std::cout;
 using std::endl;
@@ -20,20 +26,29 @@ static const size_t PAGE_SHIFT   = 13;  //8KB page
 
 inline static void* SystemAlloc(size_t kpage){
 #ifdef _WIN32
-    void* ptr = VirtualAlloc(0, kpage<<13, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-#else
-#endif
-    if(ptr == NULL){
-        throw std::bad_alloc();
-    }
+    void* ptr = VirtualAlloc(0, kpage << PAGE_SHIFT, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+    if(ptr == nullptr) throw std::bad_alloc();
     return ptr;
+#else
+    size_t bytes = kpage << PAGE_SHIFT;
+    void* ptr = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if(ptr == MAP_FAILED) throw std::bad_alloc();
+    return ptr;
+#endif
 }
 
-inline static void SystemFree(void* ptr)
+inline static void SystemFree(void* ptr, size_t kpage = 0)
 {
 #ifdef _WIN32
-	VirtualFree(ptr, 0, MEM_RELEASE);
+    (void)kpage;
+    VirtualFree(ptr, 0, MEM_RELEASE);
 #else
+    if(ptr){
+        if(kpage){
+            munmap(ptr, kpage << PAGE_SHIFT);
+        }
+        // If kpage not provided we cannot safely munmap size; caller should supply.
+    }
 #endif
 }
 
@@ -44,9 +59,7 @@ static void*& ObjNext(void* obj){
 class FreeList
 {
 public:
-    size_t Size(){
-        return _size;
-    }
+    size_t Size() const { return _size; }
 
     void PopRange(void*&start, void*& end, size_t n){
         assert(n<=_size);
@@ -60,15 +73,13 @@ public:
         _size -= n;
     }
 
-    void PushRange(void* start, void* end, size_t size){ //head insert multiple nodes
+    void PushRange(void* start, void* end, size_t count){ //head insert multiple nodes
         ObjNext(end) = _freeList;
         _freeList = start;
-        _size += size;
+        _size += count;
     }
 
-    bool Empty(){
-        return _freeList == nullptr;
-    }
+    bool Empty() const { return _freeList == nullptr; }
 
     void Push(void* obj){
         assert(obj);
@@ -85,15 +96,15 @@ public:
         return obj;
     }
 
-    size_t& MaxSize(){
-        return _maxSize;
-    }
+    size_t& MaxSize(){ return _maxSize; }
 
 private:
     void* _freeList = nullptr;
     size_t _maxSize = 1; //cur freelist apply not reach max, default 1
     size_t _size = 0; //how many obj in freelist
-}
+};
+
+using PageID = size_t;
 
 struct Span
 {
@@ -113,57 +124,51 @@ struct Span
 class SpanList
 {
 public:
+    SpanList(){
+        _head = new Span;
+        _head->_next = _head;
+        _head->_prev = _head;
+    }
+
+    ~SpanList(){ delete _head; }
+
     Span* PopFront(){
-        Span* front = _head->next;
+        Span* front = _head->_next;
+        if(front == _head) return nullptr;
         Erase(front);
         return front;
     }
 
-    bool Empty(){
-        return _head->next == _head;
-    }
+    bool Empty() const { return _head->_next == _head; }
+    Span* Begin() const { return _head->_next; }
+    Span* End()   const { return _head; }
 
-    Span* Begin(){
-        return _head->next;
-    }
-    Span* End(){
-        return _head;
-    }
-    std::mutex _mtx;
-    SpanList(){
-        _head = new Span;
-        _head->next = _head;
-        _head->prev = _head;
-    }
+    void PushFront(Span* span){ Insert(_head->_next, span); }
 
     void Insert(Span* pos, Span* ptr){
-        //insert ptr before pos
         assert(pos);
-        assert(ptr); //cannot be empty
-
+        assert(ptr);
         Span* prev = pos->_prev;
-        prev->next = ptr;
+        prev->_next = ptr;
         ptr->_prev = prev;
-
-        ptr->next = pos;
-        pos->prev = ptr;
+        ptr->_next = pos;
+        pos->_prev = ptr;
     }
 
     void Erase(Span* pos){
         assert(pos);
-        assert(ptr);
-
+        if(pos == _head) return; // do not remove head sentinel
         Span* prev = pos->_prev;
         Span* next = pos->_next;
-
         prev->_next = next;
-        next->_prev = prev; 
-        //pos node not need delete,because pos node's Span need to recycle
+        next->_prev = prev;
     }
+
+    std::mutex _mtx; // public for external locking patterns
 
 private:
     Span* _head;
-}
+};
 
 class SizeClass
 {

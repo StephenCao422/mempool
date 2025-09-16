@@ -1,25 +1,34 @@
-#include "ThreadCache.h"
+#include "../inc/ThreadCache.h"
+#include "../inc/CentralCache.h"
+#include "../inc/PageCache.h"
+#include <algorithm>
+#if defined(_WIN32)
+__declspec(thread) ThreadCache* pTLSThreadCache = nullptr;
+#else
+thread_local ThreadCache* pTLSThreadCache = nullptr;
+#endif
 
 void* ThreadCache::Allocate(size_t size){
     assert(size <= MAX_BYTES);
 
-    size_t allignSize = SizeClass::RoundUp(size);
-    size_t index = SizeClass::Index(allignSize);
+    size_t alignSize = SizeClass::RoundUp(size);
+    size_t index = SizeClass::Index(alignSize);
 
     if(!_freeLists[index].Empty()){
         return _freeLists[index].Pop();
     }
     else {
-        return FetchFromCentralCache(index, allignSize);
+        return FetchFromCentralCache(index, alignSize);
     }
 }
 
-void* ThreadCache::Deallocate(void* obj, size_t size){
+void ThreadCache::Deallocate(void* obj, size_t size){
     assert(obj);
     assert(size <= MAX_BYTES);
 
     size_t index = SizeClass::Index(size);
     _freeLists[index].Push(obj);
+    // Optional: if list too long return some to central
 }
 
 /*  ThreadCache fetch memory from CentralCache (Slow Start like TCP conjection control)
@@ -29,38 +38,28 @@ void* ThreadCache::Deallocate(void* obj, size_t size){
     alignSize=8B, MaxSize 1B, NumMoveSize 512B, then batchNum=8B
     no limit then batchNum=MaxNum, reach limit then batchNum = NumMoveSize
 */
-void* FetchFromCentralCache(size_t index, size_t alignSize){
-#ifdef _WIN32
-    size_t batchNum = min(_freeLists[index].MaxSize(), SizeClass::NumMoveSize(alignSize));
-#else
-#endif // _WIN32
-
+void* ThreadCache::FetchFromCentralCache(size_t index, size_t alignSize){
+    size_t batchNum = std::min(_freeLists[index].MaxSize(), SizeClass::NumMoveSize(alignSize));
     if(batchNum == _freeLists[index].MaxSize()){
-        //if not reach max limit, next apply for this memory can apply one more 
-        _freeList[index].MaxSize()++;
+        _freeLists[index].MaxSize()++;
     }
     void* start = nullptr;
     void* end = nullptr;
-
     size_t actualNum = CentralCache::GetInstance()->FetchRangeObj(start, end, batchNum, alignSize);
-
-    //FetchRangeObj can gruantee actualNum>=1
     assert(actualNum >= 1);
-    
-    if(actualNum ==1){
-        assert(start==end);
-        return start;//actual num =1, return start;
-    } else{
-        _freeLists[index].PushRange(ObjNext(start), end, actuNum-1);
+    if(actualNum == 1){
+        return start;
+    } else {
+        _freeLists[index].PushRange(ObjNext(start), end, actualNum-1);
         return start;
     }
 }
 
- void  LisrTooLong(FreeList& list, size_t size){
+void ThreadCache::ListTooLong(FreeList& list, size_t size){
     void* start = nullptr;
     void* end = nullptr;
-
-    list.PopRange(start,end, list.MaxSize());
-
+    size_t batch = std::min(list.MaxSize(), list.Size());
+    if(batch == 0) return;
+    list.PopRange(start, end, batch);
     CentralCache::GetInstance()->ReleaseListToSpans(start, size);
- }
+}

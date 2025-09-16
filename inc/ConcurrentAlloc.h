@@ -1,8 +1,10 @@
-#pragma once
+﻿#pragma once
 #include "ThreadCache.h"
+#include "PageCache.h"
+#include "CentralCache.h"
 
 // thread allocate memory (tcmalloc)
-void* ConcurrentAlloc(size_t size)
+inline void* ConcurrentAlloc(size_t size)
 {
     if(size>MAX_BYTES){
         size_t alignSize = SizeClass::RoundUp(size);
@@ -30,11 +32,10 @@ void* ConcurrentAlloc(size_t size)
 }
 
 // thread free memory
-void* ConcurrentFree(void* ptr, size_t size)
+inline void ConcurrentFree(void* ptr)
 {
 	assert(ptr);
-	
-	Span* span = PageCache::GetInstance()->MapObjectToSpan(ptr);
+	Span* span = PageCache::GetInstance()->MapObjToSpan(ptr);
 	size_t size = span->_objSize;
 
 	if (size > MAX_BYTES)

@@ -1,69 +1,71 @@
 #include "../inc/PageCache.h"
+#include <cassert>
 
 PageCache PageCache::_sInst; //Eager Singleton object
 
-Span* NewSpan(size_t k){\
+Span* PageCache::NewSpan(size_t k){
     assert(k>0);
 
-    // GetInstance()._pageMtx.lock();
-
     if (k > PAGE_NUM - 1) 
-	{
-		void* ptr = SystemAlloc(k);
-		Span* span = _spanPool.New();
-		
-		span->_pageID = ((PageID)ptr >> PAGE_SHIFT);
-		span->_n = k;
+    {
+        void* ptr = SystemAlloc(k);
+        Span* span = _spanPool.New();
 
-		_idSpanMap.set(span->_pageID, span);
+        span->_pageID = ((PageID)ptr) >> PAGE_SHIFT;
+        span->_n = k;
+        span->_isUse = false;
 
-		return span;
-	}
+        // map all pages to span
+        for(size_t i=0;i<span->_n;i++){
+            _idSpanMap[span->_pageID + i] = span;
+        }
+        return span;
+    }
 
-    //1. kth bucket has span
+    //1. exact size list has span
     if(!_spanLists[k].Empty()){
         Span* span =  _spanLists[k].PopFront();
-
         for(PageID i=0; i<span->_n; i++){
             _idSpanMap[span->_pageID+i]= span;
         }
         return span;
     }
-    //2. kth bucket not have span, but other bucket behide have span
-    for(int i=k+1; i<PAGE_NUM; i++){
+    //2. find larger span and split
+    for(size_t i=k+1; i<PAGE_NUM; i++){
         if(!_spanLists[i].Empty()){
             Span* nSpan = _spanLists[i].PopFront();
-
-            Span* kSpan = _spanPool.New(); //new Span object from pool
-
+            // split first k pages for kSpan
+            Span* kSpan = _spanPool.New();
             kSpan->_pageID = nSpan->_pageID;
             kSpan->_n = k;
+            kSpan->_isUse = false;
 
-            _spanLists[nSpan->n].PushFront(nSpan);
+            nSpan->_pageID += k;
+            nSpan->_n -= k;
+            _spanLists[nSpan->_n].PushFront(nSpan);
 
-            // n-k page span map to span
-            _idSpanMap[nSpan->_pageID] = nSpan;
-            _idSpanMap[nSpan->_pageID + nSpan->_n -1] = nSpan;
-
-            for(PageID i=0; i<kSpan->_n; i++){
-                _idSpanMap[kSpan->_pageID+i]= kSpan;
+            // map pages
+            for(PageID j=0; j<kSpan->_n; j++){
+                _idSpanMap[kSpan->_pageID + j] = kSpan;
             }
-
+            // map leftover edges for buddy merging (head & tail)
+            for(PageID j=0; j<nSpan->_n; j++){
+                _idSpanMap[nSpan->_pageID + j] = nSpan;
+            }
             return kSpan;
         }
-        
-
     }
-    //3. kth bucket and other bucket not have span
+    //3. allocate large block (PAGE_NUM-1) pages then retry
     void* ptr = SystemAlloc(PAGE_NUM-1);
     Span* bigSpan =  _spanPool.New();
-    
     bigSpan->_pageID = ((PageID)ptr)>>PAGE_SHIFT;
     bigSpan->_n = PAGE_NUM-1;
-
-    _spanLIsts[PAGE_NUM-1].PushFront(bigSpan);
+    bigSpan->_isUse = false;
+    _spanLists[bigSpan->_n].PushFront(bigSpan);
+    for(PageID j=0;j<bigSpan->_n;j++){
+        _idSpanMap[bigSpan->_pageID + j] = bigSpan;
+    }
     return NewSpan(k);
-
 }
 
 Span* PageCache::MapObjToSpan(void* obj){
@@ -76,20 +78,24 @@ Span* PageCache::MapObjToSpan(void* obj){
     if(it != _idSpanMap.end()){
         return it->second;
     } else{
-        assert(false);
+        fprintf(stderr, "[MapObjToSpan] Failed to map object %p pageID=%zu\n", obj, (size_t)id);
+        assert(false && "MapObjToSpan: page id not found");
         return nullptr;
     }
 }
 
 
-void ReleaseSpanToPageCache(Span* span){
+void PageCache::ReleaseSpanToPageCache(Span* span){
     if (span->_n > PAGE_NUM - 1)
 	{
 		void* ptr = (void*)(span->_pageID << PAGE_SHIFT);
-		SystemFree(ptr);
-		_spanPool.Delete(span);
-
-		return;
+        SystemFree(ptr, span->_n);
+        // Erase mapping entries for big span pages
+        for(PageID i=0;i<span->_n;++i){
+            _idSpanMap.erase(span->_pageID + i);
+        }
+        _spanPool.Delete(span);
+        return;
 	}
 
 
@@ -101,9 +107,9 @@ void ReleaseSpanToPageCache(Span* span){
             break;
         }
 
-        Span* leftSpan = it->second;
+    Span* leftSpan = it->second;
 
-        if(leftSpan->_isUsed == true){
+        if(leftSpan->_isUse == true){
             break;
         }
 
@@ -111,11 +117,20 @@ void ReleaseSpanToPageCache(Span* span){
             break;
         }
 
-        span->_pageID = leftSpan->_pageID;
-        span->_n += leftSpan->_n;
+        PageID newStart = leftSpan->_pageID;
+        size_t leftN = leftSpan->_n;
 
+        // detach leftSpan from list
         _spanLists[leftSpan->_n].Erase(leftSpan);
-        // delete leftSpan;?
+
+        // update span to cover left + current
+        span->_pageID = newStart;
+        span->_n += leftN;
+
+        // remap all pages covered by leftSpan to span
+        for(PageID i=0;i<leftN;++i){
+            _idSpanMap[newStart + i] = span;
+        }
         _spanPool.Delete(leftSpan);
     }
     while(1){
@@ -128,7 +143,7 @@ void ReleaseSpanToPageCache(Span* span){
 
         Span* rightSpan = it->second;
 
-        if(rightSpan->_isUsed == true){
+        if(rightSpan->_isUse == true){
             break;
         }
 
@@ -136,17 +151,20 @@ void ReleaseSpanToPageCache(Span* span){
             break;
         }
 
-        span->_n += rightSpan->_n;
+        size_t rightN = rightSpan->_n;
 
         _spanLists[rightSpan->_n].Erase(rightSpan);
-        // delete rightSpan;
+        // extend span
+        for(PageID i=0;i<rightN;++i){
+            _idSpanMap[rightSpan->_pageID + i] = span; // remap pages
+        }
+        span->_n += rightN;
         _spanPool.Delete(rightSpan);
     }
     _spanLists[span->_n].PushFront(span);
 	span->_isUse = false;// back from cc to pc
-
-	/*_idSpanMap[span->_pageID] = span; 
-	_idSpanMap[span->_pageID + span->_n - 1] = span;*/
-	_idSpanMap.set(span->_pageID, span);
-	_idSpanMap.set(span->_pageID + span->_n - 1, span);
+    // Ensure mapping for boundary pages (already updated during merges but keep consistent)
+    for(PageID i=0;i<span->_n;++i){
+        _idSpanMap[span->_pageID + i] = span;
+    }
 }
