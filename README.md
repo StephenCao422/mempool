@@ -9,14 +9,6 @@ A tcmalloc‑inspired memory pool for **Linux** with:
 
 ---
 
-## Requirements
-
-- Ubuntu 22.04 LTS
-- `g++` or `clang++`
-- `make`
-
----
-
 ## Build
 
 ```bash
@@ -75,3 +67,4 @@ make run-bench NTHREADS=16 ITERS=400000 MIN=8 MAX=256 KEEP=75
 - **Fast pointer→span lookup** via a **radix-tree page map** (used to address MapObj→Span lookup bottlenecks)
 - **Large allocations** (>~256 KB) bypass tc and take a separate path appropriate for big blocks
 
+![mempool](<mempool.png>)
