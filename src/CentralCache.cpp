@@ -6,6 +6,7 @@ CentralCache CentralCache::_sInst; //Eager Singleton object
 
 size_t CentralCache::FetchRangeObj(void*& start, void*& end, size_t batchNum, size_t size){
     size_t index = SizeClass::Index(size); //get size corresponding to which SpanList
+    assert(index < FREE_LIST_NUM && "size class index out of range");
 
     _spanLists[index]._mtx.lock();
     Span* span = GetOneSpan(_spanLists[index], size);//get one non-empty span from spanlist
@@ -60,6 +61,8 @@ Span* CentralCache::GetOneSpan(SpanList& list, size_t size){
     start += size;
     
     int i =0;
+
+    CheckCanStorePtr(size);
 
     while(start<end){
         i++;

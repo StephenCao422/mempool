@@ -1,5 +1,6 @@
 #include "../inc/PageCache.h"
 #include <cassert>
+#include <cstdint>
 
 PageCache PageCache::_sInst; //Eager Singleton object
 
@@ -8,7 +9,9 @@ Span* PageCache::NewSpan(size_t k){
 
     if (k > PAGE_NUM - 1) 
     {
-        void* ptr = SystemAlloc(k);
+        // void* ptr = SystemAlloc(k);
+        void* ptr = SystemAlloc(k << PAGE_SHIFT);
+        assert((((std::uintptr_t)ptr) & ((1ull << PAGE_SHIFT) - 1)) == 0 && "SystemAlloc must return 8KiB-aligned");
         Span* span = _spanPool.New();
 
         span->_pageID = ((PageID)ptr) >> PAGE_SHIFT;
@@ -56,7 +59,9 @@ Span* PageCache::NewSpan(size_t k){
         }
     }
     //3. allocate large block (PAGE_NUM-1) pages then retry
-    void* ptr = SystemAlloc(PAGE_NUM-1);
+    // void* ptr = SystemAlloc(PAGE_NUM-1);
+    void* ptr = SystemAlloc((PAGE_NUM - 1) << PAGE_SHIFT);
+    assert((((std::uintptr_t)ptr) & ((1ull << PAGE_SHIFT) - 1)) == 0 && "SystemAlloc must return 8KiB-aligned");
     Span* bigSpan =  _spanPool.New();
     bigSpan->_pageID = ((PageID)ptr)>>PAGE_SHIFT;
     bigSpan->_n = PAGE_NUM-1;
@@ -89,7 +94,7 @@ void PageCache::ReleaseSpanToPageCache(Span* span){
     if (span->_n > PAGE_NUM - 1)
 	{
 		void* ptr = (void*)(span->_pageID << PAGE_SHIFT);
-        SystemFree(ptr, span->_n);
+        SystemFree(ptr, span->_n << PAGE_SHIFT);
         // Erase mapping entries for big span pages
         for(PageID i=0;i<span->_n;++i){
             _idSpanMap.erase(span->_pageID + i);

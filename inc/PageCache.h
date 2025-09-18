@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "ObjectPool.h"
+#include "PageMap.h"
 
 class PageCache
 {
@@ -22,6 +23,7 @@ class PageCache
         SpanList _spanLists[PAGE_NUM]; //hash bucket each have span
 
         std::unordered_map<PageID, Span*> _idSpanMap; //hash map record pageID to span
+        // PageMap _pagemap;
 
         ObjectPool<Span> _spanPool; //span object pool
 

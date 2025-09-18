@@ -2,17 +2,14 @@
 #include "../inc/CentralCache.h"
 #include "../inc/PageCache.h"
 #include <algorithm>
-#if defined(_WIN32)
-__declspec(thread) ThreadCache* pTLSThreadCache = nullptr;
-#else
 thread_local ThreadCache* pTLSThreadCache = nullptr;
-#endif
 
 void* ThreadCache::Allocate(size_t size){
     assert(size <= MAX_BYTES);
 
     size_t alignSize = SizeClass::RoundUp(size);
     size_t index = SizeClass::Index(alignSize);
+    assert(index < FREE_LIST_NUM && "size class index out of range");
 
     if(!_freeLists[index].Empty()){
         return _freeLists[index].Pop();
@@ -27,6 +24,8 @@ void ThreadCache::Deallocate(void* obj, size_t size){
     assert(size <= MAX_BYTES);
 
     size_t index = SizeClass::Index(size);
+    assert(index < FREE_LIST_NUM && "size class index out of range");
+
     _freeLists[index].Push(obj);
     // Optional: if list too long return some to central
 }

@@ -1,5 +1,5 @@
 CXX := g++
-CXXFLAGS := -std=c++17 -Wall -Wextra -O2 -g -Iinc -pthread
+CXXFLAGS := -O2 -g -std=gnu++17 -pthread -Wall -Wextra
 LDLIBS := -pthread
 
 SRC_DIR := src

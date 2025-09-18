@@ -15,8 +15,4 @@ private:
     FreeList _freeLists[FREE_LIST_NUM]; //hash table of freelist 
 };
 
-#if defined(_WIN32)
-__declspec(thread) extern ThreadCache* pTLSThreadCache;
-#else
 extern thread_local ThreadCache* pTLSThreadCache;
-#endif

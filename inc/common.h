@@ -5,10 +5,8 @@
 #include <mutex>
 #include <cassert>
 #include <unordered_map>
-#ifndef _WIN32
-#include <sys/mman.h>
-#include <unistd.h>
-#endif
+#include "os_alloc.h"
+
 using std::vector; 
 using std::cout;
 using std::endl;
@@ -18,42 +16,14 @@ static const size_t MAX_BYTES     = 256*1024; //tc max alloate byte once
 static const size_t PAGE_NUM     = 129; //max manage page num of span
 static const size_t PAGE_SHIFT   = 13;  //8KB page
 
-#ifdef _WIN32
-    #include <windows.h>
-#else
 
-#endif // _WIN32
-
-inline static void* SystemAlloc(size_t kpage){
-#ifdef _WIN32
-    void* ptr = VirtualAlloc(0, kpage << PAGE_SHIFT, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-    if(ptr == nullptr) throw std::bad_alloc();
-    return ptr;
-#else
-    size_t bytes = kpage << PAGE_SHIFT;
-    void* ptr = mmap(nullptr, bytes, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-    if(ptr == MAP_FAILED) throw std::bad_alloc();
-    return ptr;
-#endif
-}
-
-inline static void SystemFree(void* ptr, size_t kpage = 0)
-{
-#ifdef _WIN32
-    (void)kpage;
-    VirtualFree(ptr, 0, MEM_RELEASE);
-#else
-    if(ptr){
-        if(kpage){
-            munmap(ptr, kpage << PAGE_SHIFT);
-        }
-        // If kpage not provided we cannot safely munmap size; caller should supply.
-    }
-#endif
-}
-
-static void*& ObjNext(void* obj){
+static inline void*& ObjNext(void* obj){
     return *(void**)obj;
+}
+
+static inline void CheckCanStorePtr(size_t block_size) {
+    assert(block_size >= sizeof(void*) && "Block too small to store 'next' pointer");
+    assert((block_size % 8) == 0 && "Small object must be >=8-byte aligned");
 }
 
 class FreeList

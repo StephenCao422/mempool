@@ -7,8 +7,8 @@
 inline void* ConcurrentAlloc(size_t size)
 {
     if(size>MAX_BYTES){
-        size_t alignSize = SizeClass::RoundUp(size);
-		size_t k = alignSize >> PAGE_SHIFT;
+        size_t k = (size + ((1u << PAGE_SHIFT) - 1)) >> PAGE_SHIFT;
+		if (k == 0) k = 1;
 
 		PageCache::GetInstance()->_pageMtx.lock();
 		Span* span = PageCache::GetInstance()->NewSpan(k);
