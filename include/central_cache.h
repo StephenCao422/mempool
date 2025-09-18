@@ -1,10 +1,10 @@
 #pragma once
 #include "common.h"
 
-class CentralCache
+class central_cache
 {
 public:
-    static CentralCache* GetInstance(){
+    static central_cache* get_instance(){
         return &_sInst;
     }
 
@@ -14,18 +14,18 @@ public:
         size: single mem block needed for tc
         return actural mem provided by cc
     */
-    size_t FetchRangeObj(void*& start, void*& end, size_t n, size_t size);
-    Span* GetOneSpan(SpanList& list, size_t size);
+    size_t fetch_range_obj(void*& start, void*& end, size_t n, size_t size);
+    Span* get_one_span(span_list& list, size_t size);
 
-    void ReleaseListToSpans(void* start, size_t size);
-
-private:
-    CentralCache(){}
-    CentralCache(const CentralCache& copy) = delete;
-    CentralCache& operator=(const CentralCache& copy) = delete;
+    void release_list_to_spans(void* start, size_t size);
 
 private:
-    SpanList _spanLists[FREE_LIST_NUM]; //hash bucket each have span
-    static CentralCache _sInst;//Eager Singleton
+    central_cache(){}
+    central_cache(const central_cache& copy) = delete;
+    central_cache& operator=(const central_cache& copy) = delete;
+
+private:
+    span_list _spanLists[FREE_LIST_NUM]; //hash bucket each have span
+    static central_cache _sInst;//Eager Singleton
 
 };

@@ -9,7 +9,7 @@ static constexpr std::size_t kAllocPageShift = 13;
 static constexpr std::size_t kAllocPageSize  = 1ull << kAllocPageShift;
 
 // Returns an 8 KiB–aligned mapping of exactly `bytes` length.
-static inline void* SystemAlloc(std::size_t bytes) {
+static inline void* system_alloc(std::size_t bytes) {
     if (bytes == 0) bytes = kAllocPageSize;
 
     // Over-map by one 8 KiB page so we can align up to 8 KiB.
@@ -37,7 +37,7 @@ static inline void* SystemAlloc(std::size_t bytes) {
     return (void*)aligned; // guaranteed 8 KiB–aligned
 }
 
-static inline void SystemFree(void* p, std::size_t bytes) {
+static inline void system_free(void* p, std::size_t bytes) {
     if (!p) return;
     ::munmap(p, bytes);
 }

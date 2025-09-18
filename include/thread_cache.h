@@ -3,16 +3,16 @@
 #include "central_cache.h"
 
 
-class ThreadCache 
+class thread_cache 
 {
 public:
     void* Allocate(size_t size);
     void  Deallocate(void* obj, size_t size);
-    void* FetchFromCentralCache(size_t index, size_t alignSize);
-    void  ListTooLong(FreeList& list, size_t size);
+    void* fetch_from_cc(size_t index, size_t alignSize);
+    void  list_too_long(free_list& list, size_t size);
 
 private:
-    FreeList _freeLists[FREE_LIST_NUM]; //hash table of freelist 
+    free_list free_lists_i[FREE_LIST_NUM]; //hash table of freelist 
 };
 
-extern thread_local ThreadCache* pTLSThreadCache;
+extern thread_local thread_cache* pTLSThreadCache;

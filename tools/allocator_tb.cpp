@@ -10,37 +10,37 @@
 
 using namespace std;
 
-void Alloc1(){ for(int i=0;i<5;++i) ConcurrentAlloc(6); }
-void Alloc2(){ for(int i=0;i<5;++i) ConcurrentAlloc(7); }
+void Alloc1(){ for(int i=0;i<5;++i) concurrent_alloc(6); }
+void Alloc2(){ for(int i=0;i<5;++i) concurrent_alloc(7); }
 void AllocTest(){ thread t1(Alloc1); t1.join(); thread t2(Alloc2); t2.join(); }
 
 void ConcurrentAllocTest1(){
     void* ptrs[5];
-    ptrs[0]=ConcurrentAlloc(5); ptrs[1]=ConcurrentAlloc(8); ptrs[2]=ConcurrentAlloc(4); ptrs[3]=ConcurrentAlloc(6); ptrs[4]=ConcurrentAlloc(3);
+    ptrs[0]=concurrent_alloc(5); ptrs[1]=concurrent_alloc(8); ptrs[2]=concurrent_alloc(4); ptrs[3]=concurrent_alloc(6); ptrs[4]=concurrent_alloc(3);
     for(void* p:ptrs) cout<<p<<"\n"; }
 
 void ConcurrentAllocTest2(){
     // for (int i = 0; i < 1024; ++i) {
-    //     void* p = ConcurrentAlloc(5);
-    //     ConcurrentFree(p);
+    //     void* p = concurrent_alloc(5);
+    //     concurrent_free(p);
     // }
 
     for (int i = 0; i < 1024; ++i) {
-        [[maybe_unused]] void* ptr = ConcurrentAlloc(5);
+        [[maybe_unused]] void* ptr = concurrent_alloc(5);
     }
-    void* ptr = ConcurrentAlloc(3); cout << "-----" << ptr << endl; }
+    void* ptr = concurrent_alloc(3); cout << "-----" << ptr << endl; }
 
 void TestConcurrentFree1(){
-    vector<void*> v; int sizes[]={5,8,4,6,3,3,3}; for(int s: sizes) v.push_back(ConcurrentAlloc(s));
-    for(void* p: v) ConcurrentFree(p); }
+    vector<void*> v; int sizes[]={5,8,4,6,3,3,3}; for(int s: sizes) v.push_back(concurrent_alloc(s));
+    for(void* p: v) concurrent_free(p); }
 
-void MultiThreadAlloc1(){ vector<void*> v; for(size_t i=0;i<7000;++i){ v.push_back(ConcurrentAlloc(6)); } for(void* p: v) ConcurrentFree(p);} 
-void MultiThreadAlloc2(){ vector<void*> v; for(size_t i=0;i<7000;++i){ v.push_back(ConcurrentAlloc(16)); } for(void* p: v) ConcurrentFree(p);} 
+void MultiThreadAlloc1(){ vector<void*> v; for(size_t i=0;i<7000;++i){ v.push_back(concurrent_alloc(6)); } for(void* p: v) concurrent_free(p);} 
+void MultiThreadAlloc2(){ vector<void*> v; for(size_t i=0;i<7000;++i){ v.push_back(concurrent_alloc(16)); } for(void* p: v) concurrent_free(p);} 
 void TestMultiThread(){ thread t1(MultiThreadAlloc1); thread t2(MultiThreadAlloc2); t1.join(); t2.join(); }
 
-void TestAddressShift(){ PageID id1=2000,id2=2001; char* p1=(char*)(id1<<PAGE_SHIFT); char* p2=(char*)(id2<<PAGE_SHIFT); while(p1<p2){ cout<<(void*)p1<<":"<<((PageID)p1>>PAGE_SHIFT)<<"\n"; p1+=8; } }
+void TestAddressShift(){ page_id id1=2000,id2=2001; char* p1=(char*)(id1<<PAGE_SHIFT); char* p2=(char*)(id2<<PAGE_SHIFT); while(p1<p2){ cout<<(void*)p1<<":"<<((page_id)p1>>PAGE_SHIFT)<<"\n"; p1+=8; } }
 
-void BigAlloc(){ void* p1=ConcurrentAlloc(257*1024); ConcurrentFree(p1); void* p2=ConcurrentAlloc(129*8*1024); ConcurrentFree(p2);} 
+void BigAlloc(){ void* p1=concurrent_alloc(257*1024); concurrent_free(p1); void* p2=concurrent_alloc(129*8*1024); concurrent_free(p2);} 
 
 // stress test: random small allocations across many threads
 struct AllocRecord { void* ptr; size_t size; };
@@ -51,21 +51,21 @@ void StressWorker(size_t threadId, size_t iterations, vector<AllocRecord>& recBu
     recBuf.reserve(iterations/2);
     for(size_t i=0;i<iterations;++i){
         size_t sz = distSize(rng);
-        void* p = ConcurrentAlloc(sz);
+        void* p = concurrent_alloc(sz);
         if((i & 3)==0){ // free roughly 25% immediately
-            ConcurrentFree(p);
+            concurrent_free(p);
         } else {
             recBuf.push_back({p, sz});
         }
         if(recBuf.size()>8192){ // periodically free a batch
             for(size_t k=0;k<4096;++k){
-                ConcurrentFree(recBuf.back().ptr);
+                concurrent_free(recBuf.back().ptr);
                 recBuf.pop_back();
             }
         }
     }
     // cleanup
-    for(auto &r: recBuf) ConcurrentFree(r.ptr);
+    for(auto &r: recBuf) concurrent_free(r.ptr);
     recBuf.clear();
 }
 

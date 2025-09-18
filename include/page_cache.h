@@ -4,34 +4,34 @@
 #include "object_pool.h"
 #include "page_map.h"
 
-class PageCache
+class page_cache
 {
     public:
-        static PageCache* GetInstance(){
+        static page_cache* get_instance(){
             return &_sInst;
         }
 
-        Span* NewSpan(size_t k); //pc bring a k page span from _spanLists
+        Span* new_span(size_t k); //pc bring a k page span from _spanLists
 
-        Span* MapObjToSpan(void* obj); //map obj to span
+        Span* map_obj_to_span(void* obj); //map obj to span
 
-        void ReleaseSpanToPageCache(Span* span); //release span to pc
+        void release_span_to_page_cache(Span* span); //release span to pc
 
         std::mutex _pageMtx;
 
     private: 
-        SpanList _spanLists[PAGE_NUM]; //hash bucket each have span
+        span_list _spanLists[PAGE_NUM]; //hash bucket each have span
 
-        // std::unordered_map<PageID, Span*> _idSpanMap; //hash map record pageID to span
-        PageMap _pagemap;
+        // std::unordered_map<page_id, Span*> _idSpanMap; //hash map record pageID to span
+        page_map _pagemap;
 
-        ObjectPool<Span> _spanPool; //span object pool
+        object_pool<Span> _spanPool; //span object pool
 
     private:
-        PageCache(){}
-        PageCache(const PageCache& pc) = delete;
-        PageCache& operator=(const PageCache& pc) = delete;
+        page_cache(){}
+        page_cache(const page_cache& pc) = delete;
+        page_cache& operator=(const page_cache& pc) = delete;
 
-        static PageCache _sInst;//Eager Singleton
+        static page_cache _sInst;//Eager Singleton
 };
 

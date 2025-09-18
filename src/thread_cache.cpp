@@ -2,63 +2,63 @@
 #include "../include/central_cache.h"
 #include "../include/page_cache.h"
 #include <algorithm>
-thread_local ThreadCache* pTLSThreadCache = nullptr;
+thread_local thread_cache* pTLSThreadCache = nullptr;
 
-void* ThreadCache::Allocate(size_t size){
+void* thread_cache::Allocate(size_t size){
     assert(size <= MAX_BYTES);
 
-    size_t alignSize = SizeClass::RoundUp(size);
-    size_t index = SizeClass::Index(alignSize);
+    size_t alignSize = size_class::round_up(size);
+    size_t index = size_class::index(alignSize);
     assert(index < FREE_LIST_NUM && "size class index out of range");
 
-    if(!_freeLists[index].Empty()){
-        return _freeLists[index].Pop();
+    if(!free_lists_i[index].Empty()){
+        return free_lists_i[index].Pop();
     }
     else {
-        return FetchFromCentralCache(index, alignSize);
+        return fetch_from_cc(index, alignSize);
     }
 }
 
-void ThreadCache::Deallocate(void* obj, size_t size){
+void thread_cache::Deallocate(void* obj, size_t size){
     assert(obj);
     assert(size <= MAX_BYTES);
 
-    size_t index = SizeClass::Index(size);
+    size_t index = size_class::index(size);
     assert(index < FREE_LIST_NUM && "size class index out of range");
 
-    _freeLists[index].Push(obj);
+    free_lists_i[index].Push(obj);
     // Optional: if list too long return some to central
 }
 
-/*  ThreadCache fetch memory from CentralCache (Slow Start like TCP conjection control)
-    Control current alignSize meomry for tc by MaxSize and NumMoveSize
-    MaxSize: The max applied memory when FreeList once apply in index that not reach maximum
-    NumMoveSize: max aligned memory of tc once apply for cc
-    alignSize=8B, MaxSize 1B, NumMoveSize 512B, then batchNum=8B
-    no limit then batchNum=MaxNum, reach limit then batchNum = NumMoveSize
+/*  thread_cache fetch memory from central_cache (Slow Start like TCP conjection control)
+    Control current alignSize meomry for tc by MaxSize and num_move_size
+    MaxSize: The max applied memory when free_list once apply in index that not reach maximum
+    num_move_size: max aligned memory of tc once apply for cc
+    alignSize=8B, MaxSize 1B, num_move_size 512B, then batchNum=8B
+    no limit then batchNum=MaxNum, reach limit then batchNum = num_move_size
 */
-void* ThreadCache::FetchFromCentralCache(size_t index, size_t alignSize){
-    size_t batchNum = std::min(_freeLists[index].MaxSize(), SizeClass::NumMoveSize(alignSize));
-    if(batchNum == _freeLists[index].MaxSize()){
-        _freeLists[index].MaxSize()++;
+void* thread_cache::fetch_from_cc(size_t index, size_t alignSize){
+    size_t batchNum = std::min(free_lists_i[index].MaxSize(), size_class::num_move_size(alignSize));
+    if(batchNum == free_lists_i[index].MaxSize()){
+        free_lists_i[index].MaxSize()++;
     }
     void* start = nullptr;
     void* end = nullptr;
-    size_t actualNum = CentralCache::GetInstance()->FetchRangeObj(start, end, batchNum, alignSize);
+    size_t actualNum = central_cache::get_instance()->fetch_range_obj(start, end, batchNum, alignSize);
     assert(actualNum >= 1);
     if(actualNum == 1){
         return start;
     } else {
-        _freeLists[index].PushRange(ObjNext(start), end, actualNum-1);
+        free_lists_i[index].PushRange(obj_next(start), end, actualNum-1);
         return start;
     }
 }
 
-void ThreadCache::ListTooLong(FreeList& list, size_t size){
+void thread_cache::list_too_long(free_list& list, size_t size){
     void* start = nullptr;
     void* end = nullptr;
     size_t batch = std::min(list.MaxSize(), list.Size());
     if(batch == 0) return;
     list.PopRange(start, end, batch);
-    CentralCache::GetInstance()->ReleaseListToSpans(start, size);
+    central_cache::get_instance()->release_list_to_spans(start, size);
 }

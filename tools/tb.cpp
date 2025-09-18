@@ -137,7 +137,7 @@ int main(int argc, char** argv) {
   if (argc >= 6) cfg.keep_ratio = std::clamp(std::atof(argv[5]) / 100.0, 0.0, 1.0);
 
   auto libc = run_bench("malloc/free", &LibcAlloc, &LibcFree, cfg);
-  auto mine = run_bench("ConcurrentAlloc/Free", &ConcurrentAlloc, &ConcurrentFree, cfg);
+  auto mine = run_bench("concurrent_alloc/Free", &concurrent_alloc, &concurrent_free, cfg);
 
   double speedup = (double)libc.elapsed.count() / (double)mine.elapsed.count();
   std::cout << std::fixed << std::setprecision(3);

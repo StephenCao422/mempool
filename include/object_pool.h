@@ -7,7 +7,7 @@
 
 
 template <class T>
-class ObjectPool {
+class object_pool {
     private:
         char* _memory = nullptr;
         void* _freelist = nullptr;
