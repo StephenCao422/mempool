@@ -10,7 +10,6 @@
 
 using namespace std;
 
-// Reference tests adapted from user example
 void Alloc1(){ for(int i=0;i<5;++i) ConcurrentAlloc(6); }
 void Alloc2(){ for(int i=0;i<5;++i) ConcurrentAlloc(7); }
 void AllocTest(){ thread t1(Alloc1); t1.join(); thread t2(Alloc2); t2.join(); }
@@ -21,7 +20,14 @@ void ConcurrentAllocTest1(){
     for(void* p:ptrs) cout<<p<<"\n"; }
 
 void ConcurrentAllocTest2(){
-    for(int i=0;i<1024;++i){ void* ptr = ConcurrentAlloc(5); /* optionally store */ }
+    // for (int i = 0; i < 1024; ++i) {
+    //     void* p = ConcurrentAlloc(5);
+    //     ConcurrentFree(p);
+    // }
+
+    for (int i = 0; i < 1024; ++i) {
+        [[maybe_unused]] void* ptr = ConcurrentAlloc(5);
+    }
     void* ptr = ConcurrentAlloc(3); cout << "-----" << ptr << endl; }
 
 void TestConcurrentFree1(){
@@ -36,7 +42,7 @@ void TestAddressShift(){ PageID id1=2000,id2=2001; char* p1=(char*)(id1<<PAGE_SH
 
 void BigAlloc(){ void* p1=ConcurrentAlloc(257*1024); ConcurrentFree(p1); void* p2=ConcurrentAlloc(129*8*1024); ConcurrentFree(p2);} 
 
-// Stress test: random small allocations across many threads
+// stress test: random small allocations across many threads
 struct AllocRecord { void* ptr; size_t size; };
 
 void StressWorker(size_t threadId, size_t iterations, vector<AllocRecord>& recBuf){
@@ -63,14 +69,14 @@ void StressWorker(size_t threadId, size_t iterations, vector<AllocRecord>& recBu
     recBuf.clear();
 }
 
-// Benchmark helper
+// benchmark helper
 template<class F>
 long long TimeMs(F&& f){ auto start=chrono::steady_clock::now(); f(); auto end=chrono::steady_clock::now(); return chrono::duration_cast<chrono::milliseconds>(end-start).count(); }
 
 void BenchmarkCustomVsMalloc(size_t threads, size_t iterationsPerThread){
     cout << "[bench] Threads="<<threads<<" iterations/thread="<<iterationsPerThread<<"\n";
 
-    // Custom allocator benchmark
+    //custom allocator benchmark
     long long customMs = TimeMs([&]{
         vector<thread> ts; ts.reserve(threads);
         vector<vector<AllocRecord>> buffers(threads);
@@ -78,7 +84,7 @@ void BenchmarkCustomVsMalloc(size_t threads, size_t iterationsPerThread){
         for(auto &th: ts) th.join();
     });
 
-    // Malloc benchmark (similar pattern)
+    // malloc benchmark
     auto mallocWorker = [&](size_t threadId){
         std::mt19937_64 rng(threadId + 98765);
         std::uniform_int_distribution<size_t> dist(1,256);
@@ -109,7 +115,7 @@ int main(){
     BigAlloc();
 
     cout << "Starting stress benchmark..." << endl;
-    BenchmarkCustomVsMalloc(4, 200000); // adjust iterations as needed
+    BenchmarkCustomVsMalloc(4, 200000);
     cout << "Done." << endl;
     return 0;
 }

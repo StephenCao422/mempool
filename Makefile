@@ -1,55 +1,76 @@
-CXX := g++
-CXXFLAGS := -O2 -g -std=gnu++17 -pthread -Wall -Wextra
-LDLIBS := -pthread
+CXX       := g++
+BUILD     ?= release
 
-SRC_DIR := src
-BUILD_DIR := build/obj
-BIN_DIR := bin
+INC_DIR   := inc
+SRC_DIR   := src
+OBJ_DIR   := build/obj
+BIN_DIR   := build/bin
 
-CORE_SRCS := $(SRC_DIR)/CentralCache.cpp \
-			 $(SRC_DIR)/PageCache.cpp \
-			 $(SRC_DIR)/ThreadCache.cpp
-CORE_OBJS := $(CORE_SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
+CXXSTD    := -std=gnu++17
+CXXWARN   := -Wall -Wextra -Wpedantic -Wshadow
+THREAD    := -pthread
 
-PERF_SRC := $(SRC_DIR)/test.cpp
-PERF_OBJ := $(BUILD_DIR)/test.o
-UNIT_SRC := $(SRC_DIR)/unit_test.cpp
-UNIT_OBJ := $(BUILD_DIR)/unit_test.o
-BENCH_SRC := $(SRC_DIR)/allocator_bench.cpp
-BENCH_OBJ := $(BUILD_DIR)/allocator_bench.o
+ifeq ($(BUILD),release)
+  CXXOPT  := -O2 -g
+  SAN     :=
+else ifeq ($(BUILD),asan)
+  CXXOPT  := -O1 -g -fsanitize=address -fno-omit-frame-pointer
+  SAN     := -fsanitize=address
+else
+  CXXOPT  := -O0 -g
+  SAN     :=
+endif
 
-PERF_BIN := $(BIN_DIR)/perf_test
-UNIT_BIN := $(BIN_DIR)/unit_tests
-BENCH_BIN := $(BIN_DIR)/allocator_bench
+CXXFLAGS  := $(CXXSTD) $(CXXOPT) $(THREAD) $(CXXWARN) -I$(INC_DIR) -MMD -MP
+LDFLAGS   := $(THREAD) $(SAN)
 
-.PHONY: all clean run-perf run-unit dirs
+CORE_SRCS := $(SRC_DIR)/CentralCache.cpp $(SRC_DIR)/PageCache.cpp $(SRC_DIR)/ThreadCache.cpp
+CORE_OBJS := $(CORE_SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
-all: dirs $(PERF_BIN) $(UNIT_BIN) $(BENCH_BIN)
+TB_SRC := $(SRC_DIR)/tb.cpp
+TB_OBJ := $(OBJ_DIR)/tb.o
+TB_BIN := $(BIN_DIR)/tb
 
-dirs:
-	@mkdir -p $(BUILD_DIR) $(BIN_DIR)
+ALLOC_BENCH_SRC := $(wildcard $(SRC_DIR)/allocator_tb.cpp)
+ALLOC_BENCH_OBJ := $(ALLOC_BENCH_SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
+ALLOC_BENCH_BIN := $(if $(ALLOC_BENCH_SRC),$(BIN_DIR)/allocator_tb,)
 
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | dirs
+BINS := $(TB_BIN) $(ALLOC_BENCH_BIN)
+
+.PHONY: all clean run-bench asan veryclean
+
+all: $(BINS)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-$(PERF_BIN): $(CORE_OBJS) $(PERF_OBJ)
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDLIBS)
+$(TB_BIN): $(CORE_OBJS) $(TB_OBJ) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
-$(UNIT_BIN): $(CORE_OBJS) $(UNIT_OBJ)
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDLIBS)
+$(BIN_DIR)/allocator_tb: $(CORE_OBJS) $(ALLOC_BENCH_OBJ) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
 
-$(BENCH_BIN): $(CORE_OBJS) $(BENCH_OBJ)
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDLIBS)
+$(OBJ_DIR) $(BIN_DIR):
+	mkdir -p $@
 
-run-perf: $(PERF_BIN)
-	$(PERF_BIN)
 
-run-unit: $(UNIT_BIN)
-	$(UNIT_BIN)
+NTHREADS ?= 8
+ITERS    ?= 300000
+MIN      ?= 8
+MAX      ?= 256
+KEEP     ?= 75
 
-run-bench: $(BENCH_BIN)
-	$(BENCH_BIN)
+run-bench: $(TB_BIN)
+	$(TB_BIN) $(NTHREADS) $(ITERS) $(MIN) $(MAX) $(KEEP)
+
+asan:
+	$(MAKE) clean
+	$(MAKE) BUILD=asan
 
 clean:
-	@echo Cleaning build artifacts
-	rm -rf $(BUILD_DIR) $(BIN_DIR)
+	@echo "Cleaning build artifacts"
+	rm -rf $(OBJ_DIR) $(BIN_DIR)
+
+veryclean: clean
+
+-include $(CORE_OBJS:.o=.d) $(TB_OBJ:.o=.d) $(ALLOC_BENCH_OBJ:.o=.d)

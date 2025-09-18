@@ -19,18 +19,20 @@ Span* PageCache::NewSpan(size_t k){
         span->_isUse = false;
 
         // map all pages to span
-        for(size_t i=0;i<span->_n;i++){
-            _idSpanMap[span->_pageID + i] = span;
-        }
+        // for(size_t i=0;i<span->_n;i++){
+        //     _idSpanMap[span->_pageID + i] = span;
+        // }
+        _pagemap.set_range(span->_pageID, span->_n, span);
         return span;
     }
 
     //1. exact size list has span
     if(!_spanLists[k].Empty()){
         Span* span =  _spanLists[k].PopFront();
-        for(PageID i=0; i<span->_n; i++){
-            _idSpanMap[span->_pageID+i]= span;
-        }
+        // for(PageID i=0; i<span->_n; i++){
+        //     _idSpanMap[span->_pageID+i]= span;
+        // }
+        _pagemap.set_range(span->_pageID, span->_n, span);
         return span;
     }
     //2. find larger span and split
@@ -48,13 +50,15 @@ Span* PageCache::NewSpan(size_t k){
             _spanLists[nSpan->_n].PushFront(nSpan);
 
             // map pages
-            for(PageID j=0; j<kSpan->_n; j++){
-                _idSpanMap[kSpan->_pageID + j] = kSpan;
-            }
+            // for(PageID j=0; j<kSpan->_n; j++){
+            //     _idSpanMap[kSpan->_pageID + j] = kSpan;
+            // }
+            _pagemap.set_range(kSpan->_pageID, kSpan->_n, kSpan);
             // map leftover edges for buddy merging (head & tail)
-            for(PageID j=0; j<nSpan->_n; j++){
-                _idSpanMap[nSpan->_pageID + j] = nSpan;
-            }
+            // for(PageID j=0; j<nSpan->_n; j++){
+            //     _idSpanMap[nSpan->_pageID + j] = nSpan;
+            // }
+            _pagemap.set_range(nSpan->_pageID, nSpan->_n, nSpan);
             return kSpan;
         }
     }
@@ -67,26 +71,33 @@ Span* PageCache::NewSpan(size_t k){
     bigSpan->_n = PAGE_NUM-1;
     bigSpan->_isUse = false;
     _spanLists[bigSpan->_n].PushFront(bigSpan);
-    for(PageID j=0;j<bigSpan->_n;j++){
-        _idSpanMap[bigSpan->_pageID + j] = bigSpan;
-    }
+    // for(PageID j=0;j<bigSpan->_n;j++){
+    //     _idSpanMap[bigSpan->_pageID + j] = bigSpan;
+    // }
+    _pagemap.set_range(bigSpan->_pageID, bigSpan->_n, bigSpan);
     return NewSpan(k);
 }
 
 Span* PageCache::MapObjToSpan(void* obj){
+    // PageID id = (PageID)obj >> PAGE_SHIFT;
+
+    // std::unique_lock<std::mutex> lc(_pageMtx);
+
+    // auto it = _idSpanMap.find(id);
+
+    // if(it != _idSpanMap.end()){
+    //     return it->second;
+    // } else{
+    //     fprintf(stderr, "[MapObjToSpan] Failed to map object %p pageID=%zu\n", obj, (size_t)id);
+    //     assert(false && "MapObjToSpan: page id not found");
+    //     return nullptr;
+    // }
     PageID id = (PageID)obj >> PAGE_SHIFT;
-
-    std::unique_lock<std::mutex> lc(_pageMtx);
-
-    auto it = _idSpanMap.find(id);
-
-    if(it != _idSpanMap.end()){
-        return it->second;
-    } else{
-        fprintf(stderr, "[MapObjToSpan] Failed to map object %p pageID=%zu\n", obj, (size_t)id);
-        assert(false && "MapObjToSpan: page id not found");
-        return nullptr;
-    }
+    Span* s = _pagemap.get(id);
+    if (s) return s;
+    fprintf(stderr, "[MapObjToSpan] Failed to map object %p pageID=%zu\n", obj, (size_t)id);
+    assert(false && "MapObjToSpan: page id not found");
+    return nullptr;
 }
 
 
@@ -96,23 +107,26 @@ void PageCache::ReleaseSpanToPageCache(Span* span){
 		void* ptr = (void*)(span->_pageID << PAGE_SHIFT);
         SystemFree(ptr, span->_n << PAGE_SHIFT);
         // Erase mapping entries for big span pages
-        for(PageID i=0;i<span->_n;++i){
-            _idSpanMap.erase(span->_pageID + i);
-        }
+        // for(PageID i=0;i<span->_n;++i){
+        //     _idSpanMap.erase(span->_pageID + i);
+        // }
+        _pagemap.set_range(span->_pageID, span->_n, nullptr);
         _spanPool.Delete(span);
         return;
 	}
 
 
     while(1){
-        PageID leftID = span->_pageID -1;
-        auto it = _idSpanMap.find(leftID);
+        // PageID leftID = span->_pageID -1;
+        // auto it = _idSpanMap.find(leftID);
 
-        if(it == _idSpanMap.end()){
-            break;
-        }
+        // if(it == _idSpanMap.end()){
+        //     break;
+        // }
 
-    Span* leftSpan = it->second;
+        // Span* leftSpan = it->second;
+        Span* leftSpan = _pagemap.get(span->_pageID - 1);
+         if (!leftSpan) break;
 
         if(leftSpan->_isUse == true){
             break;
@@ -133,20 +147,23 @@ void PageCache::ReleaseSpanToPageCache(Span* span){
         span->_n += leftN;
 
         // remap all pages covered by leftSpan to span
-        for(PageID i=0;i<leftN;++i){
-            _idSpanMap[newStart + i] = span;
-        }
+        // for(PageID i=0;i<leftN;++i){
+        //     _idSpanMap[newStart + i] = span;
+        // }
+        _pagemap.set_range(newStart, leftN, span);
         _spanPool.Delete(leftSpan);
     }
     while(1){
-        PageID rightID = span->_pageID + span->_n;
-        auto it = _idSpanMap.find(rightID);
+        // PageID rightID = span->_pageID + span->_n;
+        // auto it = _idSpanMap.find(rightID);
 
-        if(it == _idSpanMap.end()){
-            break;
-        }
+        // if(it == _idSpanMap.end()){
+        //     break;
+        // }
 
-        Span* rightSpan = it->second;
+        // Span* rightSpan = it->second;
+        Span* rightSpan = _pagemap.get(span->_pageID + span->_n);
+        if (!rightSpan) break;
 
         if(rightSpan->_isUse == true){
             break;
@@ -160,16 +177,18 @@ void PageCache::ReleaseSpanToPageCache(Span* span){
 
         _spanLists[rightSpan->_n].Erase(rightSpan);
         // extend span
-        for(PageID i=0;i<rightN;++i){
-            _idSpanMap[rightSpan->_pageID + i] = span; // remap pages
-        }
+        // for(PageID i=0;i<rightN;++i){
+        //     _idSpanMap[rightSpan->_pageID + i] = span; // remap pages
+        // }
+        _pagemap.set_range(rightSpan->_pageID, rightN, span);
         span->_n += rightN;
         _spanPool.Delete(rightSpan);
     }
     _spanLists[span->_n].PushFront(span);
 	span->_isUse = false;// back from cc to pc
     // Ensure mapping for boundary pages (already updated during merges but keep consistent)
-    for(PageID i=0;i<span->_n;++i){
-        _idSpanMap[span->_pageID + i] = span;
-    }
+    // for(PageID i=0;i<span->_n;++i){
+    //     _idSpanMap[span->_pageID + i] = span;
+    // }
+    _pagemap.set_range(span->_pageID, span->_n, span);
 }
