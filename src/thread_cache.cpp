@@ -1,6 +1,6 @@
-#include "../inc/ThreadCache.h"
-#include "../inc/CentralCache.h"
-#include "../inc/PageCache.h"
+#include "../include/thread_cache.h"
+#include "../include/central_cache.h"
+#include "../include/page_cache.h"
 #include <algorithm>
 thread_local ThreadCache* pTLSThreadCache = nullptr;
 

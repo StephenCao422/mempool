@@ -1,5 +1,5 @@
-#include "../inc/CentralCache.h"
-#include "../inc/PageCache.h"
+#include "../include/central_cache.h"
+#include "../include/page_cache.h"
 #include <cassert>
 
 CentralCache CentralCache::_sInst; //Eager Singleton object

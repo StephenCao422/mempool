@@ -1,7 +1,7 @@
 ﻿#pragma once
-#include "ThreadCache.h"
-#include "PageCache.h"
-#include "CentralCache.h"
+#include "thread_cache.h"
+#include "page_cache.h"
+#include "central_cache.h"
 
 // thread allocate memory (tcmalloc)
 inline void* ConcurrentAlloc(size_t size)

@@ -11,7 +11,7 @@
 #include <thread>
 #include <vector>
 
-#include "../inc/ConcurrentAlloc.h"
+#include "../include/concurrent_alloc.h"
 
 using Clock = std::chrono::steady_clock;
 using ns    = std::chrono::nanoseconds;

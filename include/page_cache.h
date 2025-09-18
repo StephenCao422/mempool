@@ -1,8 +1,8 @@
 #pragma once
 
 #include "common.h"
-#include "ObjectPool.h"
-#include "PageMap.h"
+#include "object_pool.h"
+#include "page_map.h"
 
 class PageCache
 {

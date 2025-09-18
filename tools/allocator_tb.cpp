@@ -6,7 +6,7 @@
 #include <algorithm>
 #include <atomic>
 #include <iomanip>
-#include "../inc/ConcurrentAlloc.h"
+#include "../include/concurrent_alloc.h"
 
 using namespace std;
 

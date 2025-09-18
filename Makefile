@@ -1,7 +1,9 @@
+# ===== Linux-only Makefile =====
+
 CXX       := g++
 BUILD     ?= release
 
-INC_DIR   := inc
+INC_DIR   := include
 SRC_DIR   := src
 OBJ_DIR   := build/obj
 BIN_DIR   := build/bin
@@ -24,15 +26,15 @@ endif
 CXXFLAGS  := $(CXXSTD) $(CXXOPT) $(THREAD) $(CXXWARN) -I$(INC_DIR) -MMD -MP
 LDFLAGS   := $(THREAD) $(SAN)
 
-CORE_SRCS := $(SRC_DIR)/CentralCache.cpp $(SRC_DIR)/PageCache.cpp $(SRC_DIR)/ThreadCache.cpp
+CORE_SRCS := $(SRC_DIR)/central_cache.cpp $(SRC_DIR)/page_cache.cpp $(SRC_DIR)/thread_cache.cpp
 CORE_OBJS := $(CORE_SRCS:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
-TB_SRC := $(SRC_DIR)/tb.cpp
+TB_SRC := tools/tb.cpp
 TB_OBJ := $(OBJ_DIR)/tb.o
 TB_BIN := $(BIN_DIR)/tb
 
-ALLOC_BENCH_SRC := $(wildcard $(SRC_DIR)/allocator_tb.cpp)
-ALLOC_BENCH_OBJ := $(ALLOC_BENCH_SRC:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
+ALLOC_BENCH_SRC := $(wildcard tools/allocator_tb.cpp)
+ALLOC_BENCH_OBJ := $(ALLOC_BENCH_SRC:tools/%.cpp=$(OBJ_DIR)/%.o)
 ALLOC_BENCH_BIN := $(if $(ALLOC_BENCH_SRC),$(BIN_DIR)/allocator_tb,)
 
 BINS := $(TB_BIN) $(ALLOC_BENCH_BIN)
@@ -42,6 +44,9 @@ BINS := $(TB_BIN) $(ALLOC_BENCH_BIN)
 all: $(BINS)
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/%.o: tools/%.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 $(TB_BIN): $(CORE_OBJS) $(TB_OBJ) | $(BIN_DIR)
@@ -68,7 +73,7 @@ asan:
 	$(MAKE) BUILD=asan
 
 clean:
-	@echo "Cleaning build artifacts"
+	@echo "cleaning build files"
 	rm -rf $(OBJ_DIR) $(BIN_DIR)
 
 veryclean: clean
